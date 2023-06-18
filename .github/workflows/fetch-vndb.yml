@@ -21,18 +21,22 @@ jobs:
         run: |
           cd ..
           wget -O vndb.tar.zst https://dl.vndb.org/dump/vndb-db-latest.tar.zst
-      # 下载出来的包是zst格式的，需要解压
+          
       - name: install zstd
         run: sudo apt-get install zstd -y
-        
       - name: unzip and move
         run: |
           cd ..
           zstd -d vndb.tar.zst
           tar -xvf vndb.tar
-          mv db/* PotatoDBMapper/assets/input
+          mv db/vn* PotatoDBMapper/assets/input
         
-      - name: just for debug
-        run: | 
-          cd assets/input
-          ls -l
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "Fetch VNDB data" -a || true
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
