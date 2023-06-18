@@ -9,7 +9,7 @@ on:
   pull_request:
     branches: [ "main" ]
     
-permissions: read-all|write-all
+permissions: write-all
 
 jobs:
   run:
