@@ -29,13 +29,10 @@ jobs:
         run: |
           cd ..
           zstd -d vndb.tar.zst
-          ls -l
-#          mv vndb-db-* vndb.tar 
+          tar -xvf vndb.tar
+          mv db/* PotatoDBMapper/assets/input
         
-#      - name: Copy to data folder
-#        run: mv db
       - name: just for debug
         run: | 
-          ls -l
-          cd PotatoDBMapper
+          cd assets/input
           ls -l
