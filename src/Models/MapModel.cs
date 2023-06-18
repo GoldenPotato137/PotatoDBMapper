@@ -17,6 +17,12 @@ public class MapModel
         get;
         set;
     }
+    
+    public double BgmSimilarity
+    {
+        get;
+        set;
+    }
 
     public MapModel(string vndbId)
     {

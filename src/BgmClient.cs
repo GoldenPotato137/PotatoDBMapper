@@ -17,16 +17,16 @@ public class BgmClient
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
 
-    public async Task<int> GetId(string name)
+    public async Task<(int,double)> GetId(string name)
     {
         try
         {
             var url = "https://api.bgm.tv/search/subject/" + HttpUtility.UrlEncode(name) + "?type=4";
             var response = await _httpClient.GetAsync(url);
-            if (!response.IsSuccessStatusCode) return -1;
+            if (!response.IsSuccessStatusCode) return (0,0);
             var jsonToken = JToken.Parse(await response.Content.ReadAsStringAsync());
             var games = jsonToken["list"]!.ToObject<List<JToken>>();
-            if (games == null || games.Count == 0) return -1;
+            if (games == null || games.Count == 0) return (-1,0);
 
             double maxSimilarity = 0;
             var target = 0;
@@ -41,12 +41,11 @@ public class BgmClient
                     );
                     target = games.IndexOf(game);
                 }
-            if (maxSimilarity < 0.7) return -1;
-            return games[target]["id"]!.ToObject<int>();
+            return (games[target]["id"]!.ToObject<int>(), maxSimilarity);
         }
         catch // 解析错误，应该是拥挤控制了
         {
-            return 0;
+            return (0,0);
         }
     }
 }

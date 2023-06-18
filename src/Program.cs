@@ -27,16 +27,23 @@ async Task UpdateMapperDb(SQLiteAsyncConnection connection)
     await connection.CreateTableAsync<MapModel>();
     using var reader = new StreamReader(inputPath + "vn_titles");
     Console.WriteLine("Start updating vn_mapper.db...");
+    var cnt = 0;
     while (reader.ReadLine() is { } line)
     {
         var data = line.Split('\t');
         if (data[officialIndex] != "t") continue;
         var item = await connection.FindAsync<MapModel>(data[idIndex]) ?? new MapModel(data[idIndex]);
-        if (item.BgmId is not (null or "0")) continue;
-        item.BgmId = (await bgmClient.GetId(data[titleIndex])).ToString();
-        Console.WriteLine($"{data[titleIndex]}, vndbId:{item.VndbId}, bgmId:{item.BgmId}");
-        await connection.InsertOrReplaceAsync(item);
+        if (item.BgmSimilarity > 0.9) continue;
+        var result = await bgmClient.GetId(data[titleIndex]);
+        if (result.Item2 > item.BgmSimilarity)
+        {
+            item.BgmSimilarity = result.Item2;
+            item.BgmId = result.Item1.ToString();
+            Console.WriteLine($"{data[titleIndex]}, vndbId:{item.VndbId}, bgmId:{item.BgmId}, similarity:{item.BgmSimilarity}");
+            await connection.InsertOrReplaceAsync(item);
+        }
         await Task.Delay(5000); // 减少服务器压力
+        if (++cnt == 3800) break; // 防止action执行超时
     }
 }
 
