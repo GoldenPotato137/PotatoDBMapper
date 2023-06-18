@@ -23,7 +23,7 @@ jobs:
       - name: install zstd
         run: sudo apt-get install zstd -y
       - name: unzip
-        run: zstd -d vndb.tar.zst | mv vndb-db-* vndb.tar | tar -xvf vndb.tar
+        run: zstd -d vndb.tar.zst | ls -l | mv vndb-db-* vndb.tar 
         
 #      - name: Copy to data folder
 #        run: mv db
