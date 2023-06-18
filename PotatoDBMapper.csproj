@@ -7,9 +7,4 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
-    <ItemGroup>
-      <Folder Include="assets\db\" />
-      <Folder Include="assets\input\" />
-    </ItemGroup>
-
 </Project>
