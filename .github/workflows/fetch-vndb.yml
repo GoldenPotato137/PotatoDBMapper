@@ -24,9 +24,9 @@ jobs:
       # 下载出来的包是zst格式的，需要解压
       - name: install zstd
         run: sudo apt-get install zstd -y
-      - name: unzip
+        
+      - name: unzip and move
         run: |
-          ls -l
           cd ..
           zstd -d vndb.tar.zst
           ls -l
