@@ -1,0 +1,30 @@
+# This workflow will build a .NET project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+name: .NET
+
+on:
+  schedule:
+    - cron: '11 4 * * 1' # Every Monday at 4:11 AM UTC
+
+permissions: write-all
+
+jobs:
+  run:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Download data from VNDB
+        run: cd .. | wget -O vndb.tar.zst https://dl.vndb.org/dump/vndb-db-latest.tar.zst
+      # 下载出来的包是zst格式的，需要解压
+      - name: install zstd
+        run: sudo apt-get install zstd -y
+      - name: unzip
+        run: zstd -d vndb.tar.zst | mv vndb-db-* vndb.tar | tar -xvf vndb.tar
+        
+#      - name: Copy to data folder
+#        run: mv db
+      - name: just for debug
+        run: ls -l | cd PotatoDBMapper | ls -l
