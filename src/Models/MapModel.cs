@@ -5,32 +5,31 @@ namespace PotatoDBMapper.Models;
 [Table("map")]
 public class MapModel
 {
-    [PrimaryKey]
-    public string? VndbId
+    [PrimaryKey, AutoIncrement]
+    public int VndbId
     {
         get;
         set;
     }
 
-    public string? BgmId
-    {
-        get;
-        set;
-    }
-    
-    public double BgmSimilarity
+    public int BgmId
     {
         get;
         set;
     }
 
-    public MapModel(string vndbId)
+    public int BgmDistance
+    {
+        get;
+        set;
+    } = int.MaxValue;
+
+    public MapModel(int vndbId)
     {
         VndbId = vndbId;
     }
 
     public MapModel()
     {
-        
     }
 }
