@@ -16,6 +16,11 @@ List<string> GetHeader(string headerFile)
     return result;
 }
 
+int GetId(string s, int idIndex)
+{
+    return Convert.ToInt32(s.Split('\t')[idIndex][1..]);
+}
+
 async Task UpdateMapperDb(SQLiteAsyncConnection connection)
 {
     var header = GetHeader(inputPath + "vn_titles.header");
@@ -23,28 +28,59 @@ async Task UpdateMapperDb(SQLiteAsyncConnection connection)
     var titleIndex = header.FindIndex(x => x == "title");
     var idIndex = header.FindIndex(x => x == "id");
     if (officialIndex == -1 || titleIndex == -1 || idIndex == -1) return;
-    
+
     await connection.CreateTableAsync<MapModel>();
     using var reader = new StreamReader(inputPath + "vn_titles");
     Console.WriteLine("Start updating vn_mapper.db...");
-    var cnt = 0;
+
+    var semaphore = new SemaphoreSlim(24);
+    var tasks = new List<Task>();
+    List<string> lines = new();
+    var currentId = 0;
     while (reader.ReadLine() is { } line)
     {
-        var data = line.Split('\t');
-        if (data[officialIndex] != "t") continue;
-        var item = await connection.FindAsync<MapModel>(data[idIndex]) ?? new MapModel(data[idIndex]);
-        if (item.BgmSimilarity > 0) continue;
-        var result = await bgmClient.GetId(data[titleIndex]);
-        if (result.Item2 > item.BgmSimilarity)
+        if ((GetId(line, idIndex) != currentId || reader.EndOfStream) && currentId != 0) // 处理具有相同id的行
         {
-            item.BgmSimilarity = result.Item2;
-            item.BgmId = result.Item1.ToString();
-            Console.WriteLine($"{data[titleIndex]}, vndbId:{item.VndbId}, bgmId:{item.BgmId}, similarity:{item.BgmSimilarity}");
-            await connection.InsertOrReplaceAsync(item);
+            var lineToProcess = lines;
+            lines = new List<string>();
+            var id = currentId;
+            tasks.Add(Task.Run(async () =>
+            {
+                await semaphore.WaitAsync();
+                try
+                {
+                    var item = await connection.FindAsync<MapModel>(id) ?? new MapModel(id);
+                    var name = string.Empty;
+                    foreach (var l in lineToProcess)
+                    {
+                        var data = l.Split('\t');
+                        if (data[officialIndex] != "t") continue;
+                        name = data[titleIndex];
+                        data[idIndex] = data[idIndex].Replace("v", "");
+
+                        var result = await bgmClient.GetId(data[titleIndex]);
+                        if (result.Item2 < item.BgmDistance)
+                        {
+                            item.BgmDistance = result.Item2;
+                            item.BgmId = result.Item1;
+                        }
+                    }
+
+                    Console.WriteLine($"{name}, vndbId:{item.VndbId}, bgmId:{item.BgmId}, distance:{item.BgmDistance}");
+                    await connection.InsertOrReplaceAsync(item);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }));
         }
-        await Task.Delay(1000); // 减少服务器压力
-        //if (++cnt == 3800) break; // 防止action执行超时
+
+        lines.Add(line);
+        currentId = GetId(line, idIndex);
     }
+
+    await Task.WhenAll(tasks);
 }
 
 SQLiteAsyncConnection GetConnection()

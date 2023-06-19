@@ -1,51 +1,57 @@
-using System.Net.Http.Headers;
-using System.Web;
 using Newtonsoft.Json.Linq;
 
 namespace PotatoDBMapper;
 
 public class BgmClient
 {
-    private readonly HttpClient _httpClient;
-
-    public BgmClient()
+    private struct BgmElement
     {
-        _httpClient = new HttpClient();
-        _httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent",
-            "GoldenPotato/PotatoDBMapper (https://github.com/GoldenPotato137/PotatoDBMapper)");
-        _httpClient.DefaultRequestHeaders.Accept.Clear();
-        _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        public string NameCn;
+        public string Name;
+        public int Id;
     }
 
-    public async Task<(int,double)> GetId(string name)
-    {
-        try
-        {
-            var url = "https://api.bgm.tv/search/subject/" + HttpUtility.UrlEncode(name) + "?type=4";
-            var response = await _httpClient.GetAsync(url);
-            if (!response.IsSuccessStatusCode) return (0,0.01);
-            var jsonToken = JToken.Parse(await response.Content.ReadAsStringAsync());
-            var games = jsonToken["list"]!.ToObject<List<JToken>>();
-            if (games == null || games.Count == 0) return (-1,0.01);
+    private readonly List<BgmElement> _games = new();
 
-            double maxSimilarity = 0;
-            var target = 0;
-            foreach (var game in games)
-                if (name.Similarity(game["name_cn"]!.ToObject<string>()!) > maxSimilarity ||
-                    name.Similarity(game["name"]!.ToObject<string>()!) > maxSimilarity)
-                {
-                    maxSimilarity = Math.Max
-                    (
-                        name.Similarity(game["name_cn"]!.ToObject<string>()!),
-                        name.Similarity(game["name"]!.ToObject<string>()!)
-                    );
-                    target = games.IndexOf(game);
-                }
-            return (games[target]["id"]!.ToObject<int>(), maxSimilarity);
-        }
-        catch // 解析错误，应该是拥挤控制了
+    private void Init()
+    {
+        Console.WriteLine("Loading Bgm database...");
+        using var reader = new StreamReader("./assets/input/subject.jsonlines");
+        while (reader.ReadLine() is { } element)
         {
-            return (0,0.01);
+            var jsonToken = JToken.Parse(element);
+            if (jsonToken["type"]!.ToObject<int>() != 4) continue;
+            _games.Add(new BgmElement
+            {
+                NameCn = jsonToken["name_cn"]!.ToObject<string>()!,
+                Name = jsonToken["name"]!.ToObject<string>()!,
+                Id = jsonToken["id"]!.ToObject<int>()
+            });
         }
+    }
+
+    public async Task<(int, int)> GetId(string name)
+    {
+        var minDistance = int.MaxValue;
+        var target = new BgmElement();
+        foreach (var game in _games)
+        {
+            var d1 = name.Levenshtein(game.NameCn);
+            var d2 = name.Levenshtein(game.Name);
+            if (d1 < minDistance || d2 < minDistance)
+            {
+                minDistance = Math.Min(d1, d2);
+                target = game;
+                if(minDistance == 0) break;
+            }
+        }
+
+        await Task.CompletedTask;
+        return minDistance == int.MaxValue ? (-1, int.MaxValue) : (target.Id, minDistance);
+    }
+    
+    public BgmClient()
+    {
+        Init();
     }
 }
