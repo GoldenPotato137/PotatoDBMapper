@@ -42,8 +42,8 @@ async Task UpdateMapperDb(SQLiteAsyncConnection connection)
             Console.WriteLine($"{data[titleIndex]}, vndbId:{item.VndbId}, bgmId:{item.BgmId}, similarity:{item.BgmSimilarity}");
             await connection.InsertOrReplaceAsync(item);
         }
-        await Task.Delay(5000); // 减少服务器压力
-        if (++cnt == 3800) break; // 防止action执行超时
+        await Task.Delay(2500); // 减少服务器压力
+        //if (++cnt == 3800) break; // 防止action执行超时
     }
 }
 
