@@ -1,18 +1,17 @@
 # This workflow will build a .NET project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
 
-name: .NET
+name: Update DB
 
 on:
   schedule:
-    - cron: '11 5 * * 1' # Every Monday at 5:11 AM UTC
+    - cron: '30 15 * * 1' # Every Monday at 23:30 PM UTC+8
   workflow_dispatch:
     
 permissions: write-all
 
 jobs:
   run:
-
     runs-on: ubuntu-latest
 
     steps:
@@ -23,11 +22,10 @@ jobs:
         dotnet-version: 7
         
     - name: Prepare VNDB data
-      run: |
-        cd ..
-        zstd -d vndb.tar.zst
-        tar -xvf vndb.tar
-        mv db/vn* PotatoDBMapper/assets/input
+      run: bash ./assets/input/fetch_VNDB.sh
+
+    - name: Prepare Bangumi data
+      run: bash ./assets/input/fetch_Bangumi.sh
 
     - name: Restore dependencies
       run: dotnet restore
