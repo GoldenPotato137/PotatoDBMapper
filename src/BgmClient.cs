@@ -23,10 +23,10 @@ public class BgmClient
         {
             var url = "https://api.bgm.tv/search/subject/" + HttpUtility.UrlEncode(name) + "?type=4";
             var response = await _httpClient.GetAsync(url);
-            if (!response.IsSuccessStatusCode) return (0,0);
+            if (!response.IsSuccessStatusCode) return (0,0.01);
             var jsonToken = JToken.Parse(await response.Content.ReadAsStringAsync());
             var games = jsonToken["list"]!.ToObject<List<JToken>>();
-            if (games == null || games.Count == 0) return (-1,0);
+            if (games == null || games.Count == 0) return (-1,0.01);
 
             double maxSimilarity = 0;
             var target = 0;
@@ -45,7 +45,7 @@ public class BgmClient
         }
         catch // 解析错误，应该是拥挤控制了
         {
-            return (0,0);
+            return (0,0.01);
         }
     }
 }
