@@ -33,7 +33,7 @@ async Task UpdateMapperDb(SQLiteAsyncConnection connection)
         var data = line.Split('\t');
         if (data[officialIndex] != "t") continue;
         var item = await connection.FindAsync<MapModel>(data[idIndex]) ?? new MapModel(data[idIndex]);
-        if (item.BgmSimilarity > 0.9) continue;
+        if (item.BgmSimilarity > 0) continue;
         var result = await bgmClient.GetId(data[titleIndex]);
         if (result.Item2 > item.BgmSimilarity)
         {
@@ -42,7 +42,7 @@ async Task UpdateMapperDb(SQLiteAsyncConnection connection)
             Console.WriteLine($"{data[titleIndex]}, vndbId:{item.VndbId}, bgmId:{item.BgmId}, similarity:{item.BgmSimilarity}");
             await connection.InsertOrReplaceAsync(item);
         }
-        await Task.Delay(2500); // 减少服务器压力
+        await Task.Delay(1000); // 减少服务器压力
         //if (++cnt == 3800) break; // 防止action执行超时
     }
 }
