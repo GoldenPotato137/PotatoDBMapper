@@ -17,7 +17,7 @@ var bgmClient = new BgmClient();
 var vndb = new VndbUpgrader();
 var bgm = new BgmUpgrader(bgmClient, args);
 
-// await vndb.UpdateMapperDb(connection, inputPath, args, bgmClient);
+await vndb.UpdateMapperDb(connection, inputPath, args, bgmClient);
 await bgm.UpgradeDb(connection);
 
 await connection.CloseAsync();
