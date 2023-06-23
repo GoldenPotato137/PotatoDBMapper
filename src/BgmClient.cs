@@ -4,13 +4,6 @@ namespace PotatoDBMapper;
 
 public class BgmClient
 {
-    private struct BgmElement
-    {
-        public string NameCn;
-        public string Name;
-        public int Id;
-    }
-
     private readonly List<BgmElement> _games = new();
 
     private void Init()
@@ -54,4 +47,12 @@ public class BgmClient
     {
         Init();
     }
+    public List<BgmElement> GetGames => _games;
+}
+
+public struct BgmElement
+{
+    public string NameCn;
+    public string Name;
+    public int Id;
 }
