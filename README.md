@@ -28,6 +28,8 @@
 - **BgmDistance**
   ：（int）此字段存储从vndb的游戏名到bangumi的游戏名的修改距离。它表示两个游戏名之间的相似度，数值越小，表示两个游戏名越相似。一般来说这个数值>
   3就可以认为结果不可信了。
+- **BgmSimilarity**: (float) 此字段存储从vndb的游戏名到bangumi的游戏名的相似度。`Similarity = 1 - Distance / max(Length(vndb), Length(bgm))`。
+数值越接近1表示两个游戏名越相似。一般来说这个数值大于0.8就可以认为结果可信了。
 
 表名： title
 
