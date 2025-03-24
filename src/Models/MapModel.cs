@@ -24,6 +24,8 @@ public class MapModel
         set;
     } = int.MaxValue;
 
+    public float BgmSimilarity { get; set; } = 0f;
+
     public MapModel(int vndbId)
     {
         VndbId = vndbId;

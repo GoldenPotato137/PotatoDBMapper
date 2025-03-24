@@ -1,4 +1,5 @@
 using PotatoDBMapper.Models;
+using ShellProgressBar;
 using SQLite;
 
 namespace PotatoDBMapper.Upgrader;
@@ -35,25 +36,38 @@ public class VndbUpgrader
         await connection.CreateTableAsync<MapModel>();
         await connection.CreateTableAsync<TitleModel>();
         using var reader = new StreamReader(inputPath + "vn_titles");
-        Console.WriteLine("Start updating vn_mapper.db...");
+        var totalLines = GetLinesCount(inputPath + "vn_titles");
 
         var updateMap = args.Contains("skip-update-map") == false;
         var updateTitle = args.Contains("skip-update-title") == false;
+        var displayDetailedProgress = args.Contains("progress");
+        
+        var options = new ProgressBarOptions
+        {
+            ForegroundColor = ConsoleColor.Yellow,
+            BackgroundColor = ConsoleColor.DarkYellow,
+            ProgressCharacter = '─',
+            ProgressBarOnBottom = true
+        };
 
-        var semaphore = new SemaphoreSlim(24);
+        var semaphore = new SemaphoreSlim(Environment.ProcessorCount);
         var tasks = new List<Task>();
         List<string> lines = new();
-        var currentId = 0;
+        int currentId = 0, currentLine = 0;
+        using var pbar = new ProgressBar(totalLines, "Start updating vn_mapper.db...", options);
+        Console.WriteLine("Start updating vn_mapper.db...");
         while (await reader.ReadLineAsync() is { } line)
         {
+            currentLine++;
+            pbar.Tick($"{currentLine} / {totalLines}");
             if ((GetId(line, idIndex) != currentId || reader.EndOfStream) && currentId != 0) // 处理具有相同id的行
             {
+                await semaphore.WaitAsync();
                 var lineToProcess = lines;
                 lines = new List<string>();
                 var id = currentId;
                 tasks.Add(Task.Run(async () =>
                 {
-                    await semaphore.WaitAsync();
                     try
                     {
                         if (updateMap)
@@ -78,15 +92,18 @@ public class VndbUpgrader
                             data[idIndex] = data[idIndex].Replace("v", "");
 
                             var result = await bgmClient.GetId(data[titleIndex]);
-                            if (result.Item2 < item.BgmDistance)
+                            if (result.percent > item.BgmSimilarity)
                             {
                                 item.BgmDistance = result.Item2;
+                                item.BgmSimilarity = result.percent;
                                 item.BgmId = result.Item1;
                             }
                         }
 
-                        Console.WriteLine(
-                            $"{name}, vndbId:{item.VndbId}, bgmId:{item.BgmId}, distance:{item.BgmDistance}");
+                        if (displayDetailedProgress)
+                            Console.WriteLine(
+                                $"{name}, vndbId:{item.VndbId}, bgmId:{item.BgmId}, " +
+                                $"distance:{item.BgmDistance}, similarity:{item.BgmSimilarity}");
                         await connection.InsertOrReplaceAsync(item);
                     }
 
@@ -110,7 +127,8 @@ public class VndbUpgrader
                         foreach (var item in titleToAdd)
                             await connection.InsertOrReplaceAsync(item);
 
-                        Console.WriteLine($"{titleToAdd[0].Title} ,vndb_id:{id}, title:{titleToAdd.Count}");
+                        if (displayDetailedProgress)
+                            Console.WriteLine($"{titleToAdd[0].Title} ,vndb_id:{id}, title:{titleToAdd.Count}");
                     }
                 }));
             }
@@ -120,5 +138,13 @@ public class VndbUpgrader
         }
 
         await Task.WhenAll(tasks);
+    }
+    
+    private static int GetLinesCount(string path)
+    {
+        using var reader = new StreamReader(path);
+        var count = 0;
+        while (reader.ReadLine() is not null) count++;
+        return count;
     }
 }
