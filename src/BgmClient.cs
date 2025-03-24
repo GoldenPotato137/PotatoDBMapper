@@ -23,7 +23,7 @@ public class BgmClient
         }
     }
 
-    public async Task<(int, int)> GetId(string name)
+    public async Task<(int, int, float percent)> GetId(string name)
     {
         var minDistance = int.MaxValue;
         var target = new BgmElement();
@@ -40,7 +40,9 @@ public class BgmClient
         }
 
         await Task.CompletedTask;
-        return minDistance == int.MaxValue ? (-1, int.MaxValue) : (target.Id, minDistance);
+        return minDistance == int.MaxValue
+            ? (-1, int.MaxValue, 0f)
+            : (target.Id, minDistance, 1 - (float)minDistance / Math.Max(target.Name?.Length ?? 0, name.Length));
     }
     
     public BgmClient()
