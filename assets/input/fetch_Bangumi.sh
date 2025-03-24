@@ -1,9 +1,15 @@
+#!/usr/bin/env bash
+
 cd "$(dirname "$0")" || exit
 mkdir bangumi
 cd bangumi || exit
 
-filename=$(curl -s "https://github.com/bangumi/Archive/releases/tag/archive" | grep -oP "(?<=latest dump filename: <code>).*(?=</code>)")
-wget "https://github.com/bangumi/Archive/releases/download/archive/$filename" -O bgm.zip
+LATEST_JSON_URL="https://raw.githubusercontent.com/bangumi/Archive/master/aux/latest.json"
+DOWNLOAD_URL=$(curl -s "$LATEST_JSON_URL" | jq -r '.browser_download_url')
+
+echo "Downloading from $DOWNLOAD_URL ..."
+wget "$DOWNLOAD_URL" -O bgm.zip
+
 unzip bgm.zip
 mv subject.jsonlines ..
 
