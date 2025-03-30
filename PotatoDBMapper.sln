@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PotatoDBMapper", "PotatoDBMapper.csproj", "{FDBB3C90-3195-4EBF-AB89-776B3691EF46}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PotatoDBMapper", "PotatoDBMapper\PotatoDBMapper.csproj", "{FDBB3C90-3195-4EBF-AB89-776B3691EF46}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
