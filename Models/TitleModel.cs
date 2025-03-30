@@ -39,6 +39,6 @@ public class TitleModel
     [SuppressMessage("ReSharper", "NonReadonlyMemberInGetHashCode")]
     public override int GetHashCode()
     {
-        return HashCode.Combine(VndbId, Title);
+        return VndbId.GetHashCode() ^ Title?.GetHashCode() ?? 0;
     }
 }

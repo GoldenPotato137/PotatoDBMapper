@@ -12,8 +12,9 @@
 
 1. 下载vndb和bangumi的数据库导出，可以手动下载，也可以使用`.\assets\input\`
    里面的脚本来自动下载，具体请参考[.\assets\input\README.md](https://github.com/GoldenPotato137/PotatoDBMapper/tree/main/assets/input)。
-2. cd到项目根目录，输入命令`dotnet run`。
+2. cd到项目根目录，输入命令`dotnet run --project .\PotatoDBMapper\PotatoDBMapper.csproj`。
 3. 耐心等待30分钟左右，具体时间取决于你的电脑性能。运行结果会保存在`.\assets\db\`中。
+4. 如果你希望在IDE中编译运行，不要忘了修改工作目录到根目录~ （防止找不到asset里的数据库）
 
 ## 表结构
 
