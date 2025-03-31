@@ -34,3 +34,6 @@ jobs:
         with:
           name: PotatoVnDBMapper.Models.${{ github.run_number }}
           path: /tmp/nupkg/*.nupkg
+          
+      - name: Push to NuGet repository
+        run: dotnet nuget push /tmp/nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
