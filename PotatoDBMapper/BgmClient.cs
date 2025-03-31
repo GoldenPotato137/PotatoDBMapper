@@ -42,7 +42,7 @@ public class BgmClient
         await Task.CompletedTask;
         return minDistance == int.MaxValue
             ? (-1, int.MaxValue, 0f)
-            : (target.Id, minDistance, 1 - (float)minDistance / Math.Max(target.Name?.Length ?? 0, name.Length));
+            : (target.Id, minDistance, 1 - (float)minDistance / Math.Max(target.Name?.Length ?? 999, name.Length));
     }
     
     public BgmClient()

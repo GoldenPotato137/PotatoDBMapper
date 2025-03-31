@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using PotatoDBMapper.Models;
 using ShellProgressBar;
 using SQLite;
@@ -74,6 +75,10 @@ public class VndbUpgrader
                             await UpdateMap();
                         if (updateTitle)
                             await UpdateTitle();
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"Failed to update {id} with error: {e.Message}");
                     }
                     finally
                     {

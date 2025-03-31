@@ -1,0 +1,36 @@
+﻿name: Generate Model Nuget Package
+
+on:
+  push:
+    paths:
+      - 'Models/**'
+  workflow_dispatch:
+
+jobs:
+  generate-client:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Modify .csproj file
+        run: |
+          FILE="Models/Models.csproj"
+          # Update Version
+          sed -i "s/<Version>.*<\/Version>/<Version>1.0.$GITHUB_RUN_NUMBER<\/Version>/g" $FILE
+
+      - name: Build and pack the library
+        run: |
+          cd Models
+          dotnet build -c Release
+          dotnet pack -c Release -o /tmp/nupkg
+
+      - name: Upload NuGet package as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PotatoVnDBMapper.Models
+          path: /tmp/nupkg/*.nupkg

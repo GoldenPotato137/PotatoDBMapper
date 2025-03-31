@@ -4,10 +4,24 @@
         <TargetFramework>netstandard2.0</TargetFramework>
         <LangVersion>latestmajor</LangVersion>
         <Nullable>enable</Nullable>
+        <PackageId>PotatoVnDBMapper.Models</PackageId>
+        <Authors>goldenpotato137</Authors>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/GoldenPotato137/PotatoDBMapper</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/GoldenPotato137/PotatoDBMapper</RepositoryUrl>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
 
     <ItemGroup>
       <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <None Include="../NugetPackage/README.md">
+            <Pack>True</Pack>
+            <PackagePath>\</PackagePath>
+        </None>
     </ItemGroup>
 
 </Project>
