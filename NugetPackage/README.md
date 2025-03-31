@@ -9,19 +9,18 @@
 使用前请安装本nuget包
 
 ```csharp
-VnDbMapper mapper = new VnDbMapper();
-//可选：不使用捆绑的数据库，自己指定数据库路径 VnDbMapper("your_db_path")
+VnDbMapper mapper = new VnDbMapper("path_to_db");
 mapper.Init(); //初始化数据库链接
 
 // MapModel为原表<map>中条目的映射，请参考原项目获取这些数据的含义
-MapModel map = mapper.GetMap(1); //获取vndb id为1的映射结果
+MapModel map = await mapper.TryGetMapAsync(1); //获取vndb id为1的映射结果
 
 //获取bangumi id为114514的映射结果（一个vndb游戏可能会映射到多个bgm中，故结果是个列表）
-List<MapModel> maps = mapper.TryGetMapWithBgmId(114514); 
+List<MapModel> maps = await mapper.TryGetMapWithBgmId(114514); 
 
 //搜索某游戏的映射表，返回List<(MapModel, double)>，double为相似度
 //async Task<List<(MapModel model, double similarity)>> TryGetMapsWithName(string gameName, double minSimilarity = 0.75)
-List<(MapModel, double)> maps = mapper.TryGetMapWithName("近月少女的礼仪", 0.8);
+List<(MapModel, double)> maps = await mapper.TryGetMapWithName("近月少女的礼仪", 0.8);
 
 mapper.Dispose(); //释放资源
 ```

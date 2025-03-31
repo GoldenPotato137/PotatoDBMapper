@@ -8,7 +8,7 @@ public class VnDbMapperTest
     [OneTimeSetUp]
     public void Init()
     {
-        _mapper.Init();
+        _mapper.Init("vn_mapper.db");
     }
           
     [Test]

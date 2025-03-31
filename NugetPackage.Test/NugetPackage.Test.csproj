@@ -24,5 +24,12 @@
   <ItemGroup>
     <ProjectReference Include="..\NugetPackage\NugetPackage.csproj" />
   </ItemGroup>
+  
+  <ItemGroup>
+    <Content Include="../assets/db/vn_mapper.db">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <PackageCopyToOutput>true</PackageCopyToOutput>
+    </Content>
+  </ItemGroup>
 
 </Project>

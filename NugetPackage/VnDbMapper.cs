@@ -20,12 +20,12 @@ public class VnDbMapper : IDisposable
         }
     }
     
-    public void Init(string? dbFile = null)
+    public void Init(string dbFile)
     {
         _db?.CloseAsync();
-        if (dbFile is not null && File.Exists(dbFile) == false) 
+        if (File.Exists(dbFile) == false) 
             throw new FileNotFoundException("Database file not found.");
-        _db = new SQLiteAsyncConnection(dbFile ?? "vn_mapper.db");
+        _db = new SQLiteAsyncConnection(dbFile);
     }
 
     public async Task<MapModel?> TryGetMapAsync(int vndbId) => await Db.FindAsync<MapModel>(vndbId);
