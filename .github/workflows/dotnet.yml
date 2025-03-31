@@ -19,7 +19,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 7
+        dotnet-version: 8
         
     - name: Prepare VNDB data
       run: bash ./assets/input/fetch_VNDB.sh
