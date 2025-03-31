@@ -16,11 +16,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Content Include="../assets/db/vn_mapper.db">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-            <Pack>True</Pack>
-            <PackagePath>\</PackagePath>
-        </Content>
         <None Include="README.md">
             <Pack>True</Pack>
             <PackagePath>\</PackagePath>
