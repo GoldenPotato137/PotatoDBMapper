@@ -32,5 +32,5 @@ jobs:
       - name: Upload NuGet package as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PotatoVnDBMapper.Models
+          name: PotatoVnDBMapper.Models.$GITHUB_RUN_NUMBER
           path: /tmp/nupkg/*.nupkg
