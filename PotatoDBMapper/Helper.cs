@@ -66,4 +66,17 @@ public static class Helper
 
         return dp[n, m];
     }
+    
+    /// <summary>
+    /// 获取两个字符串的（编辑距离，相似度）
+    /// </summary>
+    /// <param name="s1"></param>
+    /// <param name="s2"></param>
+    /// <returns></returns>
+    public static (int levenshtein, float similarity) GetSimilarity(this string s1, string s2)
+    {
+        if (string.IsNullOrEmpty(s1) || string.IsNullOrEmpty(s2)) return (int.MaxValue, 0);
+        var levenshtein = s1.Levenshtein(s2);
+        return (levenshtein, 1 - levenshtein / (float)Math.Min(s1.Length, s2.Length));
+    }
 }

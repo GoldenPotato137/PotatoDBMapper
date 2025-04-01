@@ -33,29 +33,19 @@ public class VndbUpgrader
         var idIndex = header.FindIndex(x => x == "id");
         var langIndex = header.FindIndex(x => x == "lang");
         if (officialIndex == -1 || titleIndex == -1 || idIndex == -1) return;
-
-        await connection.CreateTableAsync<MapModel>();
-        await connection.CreateTableAsync<TitleModel>();
+        
         using var reader = new StreamReader(inputPath + "vn_titles");
         var totalLines = GetLinesCount(inputPath + "vn_titles");
 
         var updateMap = args.Contains("skip-update-map") == false;
         var updateTitle = args.Contains("skip-update-title") == false;
         var displayDetailedProgress = args.Contains("progress");
-        
-        var options = new ProgressBarOptions
-        {
-            ForegroundColor = ConsoleColor.Yellow,
-            BackgroundColor = ConsoleColor.DarkYellow,
-            ProgressCharacter = '─',
-            ProgressBarOnBottom = true
-        };
 
         var semaphore = new SemaphoreSlim(Environment.ProcessorCount);
         var tasks = new List<Task>();
         List<string> lines = new();
         int currentId = 0, currentLine = 0;
-        using var pbar = new ProgressBar(totalLines, "Start updating vn_mapper.db...", options);
+        using var pbar = new ProgressBar(totalLines, "Start updating vn_mapper.db...", Utils.ProgressBar.Options);
         Console.WriteLine("Start updating vn_mapper.db...");
         while (await reader.ReadLineAsync() is { } line)
         {
