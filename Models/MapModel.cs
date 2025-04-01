@@ -25,6 +25,12 @@ public class MapModel
     } = int.MaxValue;
 
     public float BgmSimilarity { get; set; } = 0f;
+    
+    public int SteamId { get; set; }
+    
+    public int SteamDistance { get; set; } = int.MaxValue;
+    
+    public float SteamSimilarity { get; set; } = 0f;
 
     public MapModel(int vndbId)
     {
