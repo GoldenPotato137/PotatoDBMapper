@@ -50,7 +50,10 @@ public class VnDbMapper : IDisposable
                 .Where(t => t.Title != null)
                 .ToListAsync())
             .Where(t => t.Title!.Similarity(gameName) >= minSimilarity)
-            .Select(t => (t, t.Title!.Similarity(gameName))).ToList();
+            .Select(t => (t, t.Title!.Similarity(gameName)))
+            .GroupBy(t => t.t.VndbId)
+            .Select(g => g.OrderByDescending(t => t.Item2).First())
+            .ToList();
 
         List<int> vndbIds = titles.Select(t => t.t.VndbId).ToList();
         Dictionary<int, double> vndbIdToSim = titles.ToDictionary(t => t.t.VndbId, t => t.sim);

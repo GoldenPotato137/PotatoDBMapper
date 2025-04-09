@@ -33,6 +33,7 @@ public class VnDbMapperTest
 
     [Test]
     [TestCase("近月少女的礼仪", 10680)]
+    [TestCase("大图书馆的牧羊人 -Dreaming Sheep-", 12480)]
     public async Task TryGetMapWithName(string name, int targetVndbId)
     {
         var result = await _mapper.TryGetMapsWithName(name);
