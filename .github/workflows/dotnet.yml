@@ -26,12 +26,15 @@ jobs:
 
     - name: Prepare Bangumi data
       run: bash ./assets/input/fetch_Bangumi.sh
+      
+    - name: Prepare Steam data
+      run: bash ./assets/input/fetch_steam.sh
 
     - name: Restore dependencies
       run: dotnet restore
 
     - name: Build and Run
-      run: dotnet run
+      run: dotnet run --project ./PotatoDBMapper/PotatoDBMapper.csproj
       
     - name: Commit and push changes
       run: |
