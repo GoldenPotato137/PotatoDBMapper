@@ -32,6 +32,7 @@ public class VndbUpgrader
         var titleIndex = header.FindIndex(x => x == "title");
         var idIndex = header.FindIndex(x => x == "id");
         var langIndex = header.FindIndex(x => x == "lang");
+        var latinIndex = header.FindIndex(x => x == "latin");
         if (officialIndex == -1 || titleIndex == -1 || idIndex == -1) return;
         
         using var reader = new StreamReader(inputPath + "vn_titles");
@@ -108,7 +109,7 @@ public class VndbUpgrader
                         foreach (var l in lineToProcess)
                         {
                             var data = l.Split('\t');
-                            if (data[officialIndex] != "t" && data[langIndex].Contains("zh") == false) continue;
+                            if (data[officialIndex] != "t" && data[langIndex].Contains("zh") == false && data[langIndex] != "en") continue;
                             if (titleToAdd.Any(title => title.Title == data[titleIndex])) continue;
                             var item = new TitleModel
                             {
@@ -116,6 +117,14 @@ public class VndbUpgrader
                                 Title = data[titleIndex]
                             };
                             titleToAdd.Add(item);
+                            if (data[langIndex] == "ja" && data[latinIndex] != "\\N")
+                            {
+                                titleToAdd.Add(new TitleModel
+                                {
+                                    VndbId = Convert.ToInt32(data[idIndex][1..]),
+                                    Title = data[latinIndex]
+                                });
+                            }
                         }
 
                         if (titleToAdd.Count == 0) return;
