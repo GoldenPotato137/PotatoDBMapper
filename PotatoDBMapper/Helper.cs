@@ -41,7 +41,7 @@ public static class Helper
             return 0;
         return (match / (double)n + match / (double)m + (match - swap / 2.0) / match) / 3.0;
     }
-
+    
     /// <summary>
     /// 计算两个字符串的编辑距离
     /// </summary>
