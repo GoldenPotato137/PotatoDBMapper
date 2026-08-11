@@ -1,4 +1,4 @@
-using System.Diagnostics;
+using System.Collections.Concurrent;
 using PotatoDBMapper.Models;
 using ShellProgressBar;
 using SQLite;
@@ -34,13 +34,22 @@ public class VndbUpgrader
         var langIndex = header.FindIndex(x => x == "lang");
         var latinIndex = header.FindIndex(x => x == "latin");
         if (officialIndex == -1 || titleIndex == -1 || idIndex == -1) return;
-        
+
         using var reader = new StreamReader(inputPath + "vn_titles");
         var totalLines = GetLinesCount(inputPath + "vn_titles");
 
         var updateMap = args.Contains("skip-update-map") == false;
         var updateTitle = args.Contains("skip-update-title") == false;
         var displayDetailedProgress = args.Contains("progress");
+
+        // 先把map表整个读进内存。逐条FindAsync/InsertOrReplaceAsync的话，几万次往返
+        // 光是sqlite的事务开销就要跑十几分钟，所以这里只在内存里改，最后一次性写回去
+        var maps = new Dictionary<int, MapModel>();
+        if (updateMap)
+            foreach (var map in await connection.Table<MapModel>().ToListAsync())
+                maps.TryAdd(map.VndbId, map);
+        var mapsToWrite = new ConcurrentBag<MapModel>();
+        var titlesToWrite = new ConcurrentBag<TitleModel>();
 
         var semaphore = new SemaphoreSlim(Environment.ProcessorCount);
         var tasks = new List<Task>();
@@ -58,14 +67,14 @@ public class VndbUpgrader
                 var lineToProcess = lines;
                 lines = new List<string>();
                 var id = currentId;
-                tasks.Add(Task.Run(async () =>
+                tasks.Add(Task.Run(() =>
                 {
                     try
                     {
                         if (updateMap)
-                            await UpdateMap();
+                            UpdateMap();
                         if (updateTitle)
-                            await UpdateTitle();
+                            UpdateTitle();
                     }
                     catch (Exception e)
                     {
@@ -76,23 +85,21 @@ public class VndbUpgrader
                         semaphore.Release();
                     }
 
-                    async Task UpdateMap()
+                    void UpdateMap()
                     {
-                        var item = await connection.FindAsync<MapModel>(id) ?? new MapModel(id);
+                        var item = maps.GetValueOrDefault(id) ?? new MapModel(id);
                         var name = string.Empty;
                         foreach (var l in lineToProcess)
                         {
                             var data = l.Split('\t');
                             if (data[officialIndex] != "t") continue;
                             name = data[titleIndex];
-                            data[idIndex] = data[idIndex].Replace("v", "");
-
-                            var result = await bgmClient.GetId(data[titleIndex]);
-                            if (result.percent > item.BgmSimilarity)
+                            var result = bgmClient.GetId(data[titleIndex]);
+                            if (result.similarity > item.BgmSimilarity)
                             {
-                                item.BgmDistance = result.Item2;
-                                item.BgmSimilarity = result.percent;
-                                item.BgmId = result.Item1;
+                                item.BgmDistance = result.distance;
+                                item.BgmSimilarity = result.similarity;
+                                item.BgmId = result.id;
                             }
                         }
 
@@ -100,10 +107,10 @@ public class VndbUpgrader
                             Console.WriteLine(
                                 $"{name}, vndbId:{item.VndbId}, bgmId:{item.BgmId}, " +
                                 $"distance:{item.BgmDistance}, similarity:{item.BgmSimilarity}");
-                        await connection.InsertOrReplaceAsync(item);
+                        mapsToWrite.Add(item);
                     }
 
-                    async Task UpdateTitle()
+                    void UpdateTitle()
                     {
                         var titleToAdd = new List<TitleModel>();
                         foreach (var l in lineToProcess)
@@ -129,7 +136,7 @@ public class VndbUpgrader
 
                         if (titleToAdd.Count == 0) return;
                         foreach (var item in titleToAdd)
-                            await connection.InsertOrReplaceAsync(item);
+                            titlesToWrite.Add(item);
 
                         if (displayDetailedProgress)
                             Console.WriteLine($"{titleToAdd[0].Title} ,vndb_id:{id}, title:{titleToAdd.Count}");
@@ -142,8 +149,44 @@ public class VndbUpgrader
         }
 
         await Task.WhenAll(tasks);
+        await WriteAsync(connection, mapsToWrite, titlesToWrite);
     }
-    
+
+    /// <summary>
+    /// 把算好的结果一次性写进数据库
+    /// </summary>
+    private static async Task WriteAsync(SQLiteAsyncConnection connection,
+        ConcurrentBag<MapModel> maps, ConcurrentBag<TitleModel> titles)
+    {
+        if (maps.IsEmpty == false)
+        {
+            Console.WriteLine($"Writing {maps.Count} maps...");
+            await connection.RunInTransactionAsync(db =>
+            {
+                foreach (var map in maps.OrderBy(map => map.VndbId))
+                    db.InsertOrReplace(map);
+            });
+        }
+
+        if (titles.IsEmpty) return;
+        // 同一个名字可能属于多个vndb游戏，而Title是title表的主键，
+        // 这里固定取vndb id最小的那个，免得每次运行的结果都不一样
+        var deduplicated = new Dictionary<string, int>();
+        foreach (var title in titles)
+        {
+            if (string.IsNullOrEmpty(title.Title)) continue;
+            if (deduplicated.TryGetValue(title.Title, out var exist) && exist <= title.VndbId) continue;
+            deduplicated[title.Title] = title.VndbId;
+        }
+
+        Console.WriteLine($"Writing {deduplicated.Count} titles...");
+        await connection.RunInTransactionAsync(db =>
+        {
+            foreach (var (title, vndbId) in deduplicated.OrderBy(pair => pair.Value))
+                db.InsertOrReplace(new TitleModel { Title = title, VndbId = vndbId });
+        });
+    }
+
     private static int GetLinesCount(string path)
     {
         using var reader = new StreamReader(path);

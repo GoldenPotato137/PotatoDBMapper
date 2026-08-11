@@ -7,41 +7,74 @@ on:
   schedule:
     - cron: '30 15 * * 1' # Every Monday at 23:30 PM UTC+8
   workflow_dispatch:
-    
-permissions: write-all
+
+permissions:
+  contents: write
 
 jobs:
   run:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8
-        
+
     - name: Prepare VNDB data
       run: bash ./assets/input/fetch_VNDB.sh
 
     - name: Prepare Bangumi data
       run: bash ./assets/input/fetch_Bangumi.sh
-      
+
     - name: Prepare Steam data
       run: bash ./assets/input/fetch_steam.sh
+      env:
+        STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+
+    - name: Prepare Ymgal data
+      run: bash ./assets/input/fetch_ymgal.sh
 
     - name: Restore dependencies
       run: dotnet restore
 
     - name: Build and Run
       run: dotnet run --project ./PotatoDBMapper/PotatoDBMapper.csproj
-      
-    - name: Commit and push changes
+
+    # 每次都是从零重新算的，所以这里拦一下明显不对的结果，别把坏库发出去
+    - name: Check result
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add .
-        git commit -m "Update data" -a || true
-        git push
+        DB=./assets/db/vn_mapper.db
+        count() { sqlite3 "$DB" "$1"; }
+        MAPS=$(count "select count(*) from map")
+        TITLES=$(count "select count(*) from title")
+        echo "map: $MAPS, title: $TITLES"
+        if [ "$MAPS" -lt 50000 ] || [ "$TITLES" -lt 80000 ]; then
+          echo "结果明显不对，不发布"
+          exit 1
+        fi
+        {
+          echo "更新于 $(date -u '+%Y-%m-%d %H:%M') UTC"
+          echo ""
+          echo "| 映射 | 有结果 | 相似度>=0.8 |"
+          echo "| --- | --- | --- |"
+          for src in Bgm Steam Ymgal; do
+            HAVE=$(count "select count(*) from map where ${src}Id != 0")
+            GOOD=$(count "select count(*) from map where ${src}Id != 0 and ${src}Similarity >= 0.8")
+            echo "| $src | $HAVE | $GOOD |"
+          done
+          echo ""
+          echo "map表 $MAPS 行，title表 $TITLES 行，字段含义见 README。"
+        } > notes.md
+        cat notes.md
+
+    # 固定用db-latest这一个release，每次覆盖上去，不然timeline会被刷满
+    - name: Publish database
+      run: |
+        gh release create db-latest ./assets/db/vn_mapper.db \
+          --title "vn_mapper.db" --notes-file notes.md \
+          || (gh release upload db-latest ./assets/db/vn_mapper.db --clobber \
+              && gh release edit db-latest --notes-file notes.md)
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -32,6 +32,15 @@ public class MapModel
     
     public float SteamSimilarity { get; set; } = 0f;
 
+    /// <summary>
+    /// 月幕Galgame（ymgal）的游戏档案id（gid）
+    /// </summary>
+    public int YmgalId { get; set; }
+
+    public int YmgalDistance { get; set; } = int.MaxValue;
+
+    public float YmgalSimilarity { get; set; } = 0f;
+
     public MapModel(int vndbId)
     {
         VndbId = vndbId;

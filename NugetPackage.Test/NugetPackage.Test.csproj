@@ -28,7 +28,8 @@
     <ProjectReference Include="..\NugetPackage\NugetPackage.csproj" />
   </ItemGroup>
   
-  <ItemGroup>
+  <!--结果库不在仓库里（改用release发布了），本地没有的话测试会自己跳过-->
+  <ItemGroup Condition="Exists('../assets/db/vn_mapper.db')">
     <Content Include="../assets/db/vn_mapper.db">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <PackageCopyToOutput>true</PackageCopyToOutput>

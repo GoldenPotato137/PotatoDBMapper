@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using SQLite;
 
 namespace PotatoDBMapper.Models;
@@ -17,28 +16,5 @@ public class TitleModel
     {
         get;
         set;
-    }
-
-    public static bool operator ==(TitleModel x, TitleModel y)
-    {
-        return x.VndbId == y.VndbId && x.Title == y.Title;
-    }
-
-    public static bool operator !=(TitleModel x, TitleModel y)
-    {
-        return !(x == y);
-    }
-    
-    public override bool Equals(object? obj)
-    {
-        if (obj is TitleModel titleModel)
-            return this == titleModel;
-        return false;
-    }
-    
-    [SuppressMessage("ReSharper", "NonReadonlyMemberInGetHashCode")]
-    public override int GetHashCode()
-    {
-        return VndbId.GetHashCode() ^ Title?.GetHashCode() ?? 0;
     }
 }

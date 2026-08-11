@@ -8,6 +8,10 @@ public class VnDbMapperTest
     [OneTimeSetUp]
     public void Init()
     {
+        if (File.Exists("vn_mapper.db") == false)
+            Assert.Ignore("找不到vn_mapper.db，可以从 " +
+                          "https://github.com/GoldenPotato137/PotatoDBMapper/releases/download/db-latest/vn_mapper.db " +
+                          "下载后放到./assets/db/下再跑测试。");
         _mapper.Init("vn_mapper.db");
     }
           
@@ -23,12 +27,14 @@ public class VnDbMapperTest
     }
 
     [Test]
-    [TestCase(44123, 1)]
-    [TestCase(406121, 3)]
-    public async Task TryGetMapWithBgmId(int bgmId, int targetCount)
+    [TestCase(44123)]
+    [TestCase(406121)]
+    public async Task TryGetMapWithBgmId(int bgmId)
     {
+        // 一个bgm游戏可能对应多个vndb游戏，具体几个会随上游数据变，所以这里只检查结果本身对不对
         var result = await _mapper.TryGetMapsWithBgmId(bgmId);
-        Assert.That(result.Count == targetCount);
+        Assert.That(result, Is.Not.Empty);
+        Assert.That(result.All(map => map.BgmId == bgmId));
     }
 
     [Test]

@@ -1,73 +1,123 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using PotatoDBMapper.Models;
-using ShellProgressBar;
+using PotatoDBMapper.Utils;
 using SQLite;
+using ProgressBar = ShellProgressBar.ProgressBar;
 
 namespace PotatoDBMapper.Upgrader;
 
+/// <summary>
+/// 基于steam的游戏列表来更新映射，匹配方式见<see cref="NameIndex"/>
+/// </summary>
 public class SteamUpgrader(SQLiteAsyncConnection connection)
 {
-    private const float SimilarityThreshold = 0.3f;
-    
+    private const string AppListFile = "./assets/input/steam.json";
+
+    /// <summary>
+    /// 相似度低于此值的匹配结果会被丢弃
+    /// </summary>
+    private const float SimilarityThreshold = 0.7f;
+
     public async Task Upgrade()
     {
-        Console.WriteLine("Loading Steam Game Lists...");
-        string jsonStr = await File.ReadAllTextAsync("./assets/input/steam.json");
-        var fullList = JsonSerializer.Deserialize<FullList>(jsonStr);
-        Console.WriteLine("Loading Game Titles...");
-        var titles = (await connection.Table<TitleModel>().ToListAsync())
-            .Where(model => !string.IsNullOrWhiteSpace(model.Title)).ToList();
-
-        var progressBar = new ProgressBar(fullList!.applist.apps.Count, "Start updating vn_mapper.db...",
-            Utils.ProgressBar.Options);
-
-        var semaphore = new SemaphoreSlim(Environment.ProcessorCount);
-        List<Task> tasks = [];
-        foreach (var appEnum in fullList.applist.apps)
+        if (File.Exists(AppListFile) == false)
         {
-            tasks.Add(Task.Run(async () =>
-            {
-                var app = appEnum;
-                await semaphore.WaitAsync();
-                progressBar.Tick($"Updating id: {app.appid} {app.name}" );
-                try
-                {
-                    float maxSimilarity = -1;
-                    var dis = 114514;
-                    TitleModel? target = null;
-                    if (string.IsNullOrEmpty(app.name)) return;
-                    foreach (var title in titles)
-                    {
-                        var status = title.Title!.GetSimilarity(app.name);
-                        if (status.similarity > maxSimilarity)
-                        {
-                            maxSimilarity = status.similarity;
-                            dis = status.levenshtein;
-                            target = title;
-                        }
-                    }
-                    if (target is not null && maxSimilarity > SimilarityThreshold)
-                    {
-                        MapModel map = await connection.FindAsync<MapModel>(target.VndbId) ?? new MapModel(target.VndbId);
-                        map.SteamId = app.appid;
-                        map.SteamSimilarity = maxSimilarity;
-                        map.SteamDistance = dis;
-                        await connection.InsertOrReplaceAsync(map);
-                    }
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine("Error: " + e.Message);
-                }
-                finally
-                {
-                    semaphore.Release();
-                }
-            }));
+            Console.WriteLine($"{AppListFile} not found, skip steam mapping. " +
+                              "You can run ./assets/input/fetch_steam.sh to download it.");
+            return;
         }
-        
-        await Task.WhenAll(tasks);
+
+        Console.WriteLine("Loading Steam Game Lists...");
+        List<SteamApp>? apps = null;
+        try
+        {
+            var jsonStr = await File.ReadAllTextAsync(AppListFile);
+            apps = JsonSerializer.Deserialize<FullList>(jsonStr)?.applist?.apps;
+        }
+        catch (JsonException e)
+        {
+            Console.WriteLine($"Failed to parse {AppListFile}: {e.Message}");
+        }
+
+        if (apps is null || apps.Count == 0)
+        {
+            Console.WriteLine($"No steam app found in {AppListFile}, skip steam mapping.");
+            return;
+        }
+
+        Console.WriteLine($"Loaded {apps.Count} steam apps.");
+        Console.WriteLine("Loading Game Titles...");
+        var titles = await connection.Table<TitleModel>().ToListAsync();
+        var index = new NameIndex(titles.Select(title => (title.Title!, title.VndbId)));
+
+        // vndbId -> 此vndb游戏匹配到的最佳steam游戏
+        var matches = new Dictionary<int, SteamMatch>();
+        using (var pbar = new ProgressBar(apps.Count, "Start updating vn_mapper.db...", Utils.ProgressBar.Options))
+        {
+            Console.WriteLine("Start matching steam apps...");
+            Parallel.ForEach(apps, () => new MatchState(index),
+                (app, _, state) =>
+                {
+                    try
+                    {
+                        if (string.IsNullOrWhiteSpace(app.name) == false)
+                            foreach (var match in state.Matcher.Match(app.name, SimilarityThreshold))
+                                Add(state.Matches, match.Id,
+                                    new SteamMatch(app.appid, match.Distance, match.Similarity));
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"Failed to match appid {app.appid} with error: {e.Message}");
+                    }
+
+                    pbar.Tick($"Updating id: {app.appid} {app.name}");
+                    return state;
+                },
+                state =>
+                {
+                    lock (matches)
+                        foreach (var (vndbId, match) in state.Matches)
+                            Add(matches, vndbId, match);
+                });
+        }
+
+        Console.WriteLine($"Matched {matches.Count} vndb games to steam, updating vn_mapper.db...");
+        await connection.RunInTransactionAsync(db =>
+        {
+            foreach (var (vndbId, match) in matches)
+            {
+                var map = db.Find<MapModel>(vndbId) ?? new MapModel(vndbId);
+                map.SteamId = match.AppId;
+                map.SteamDistance = match.Distance;
+                map.SteamSimilarity = match.Similarity;
+                db.InsertOrReplace(map);
+            }
+
+            // 加字段之前就存在的行在新字段上是null，统一成“没匹配上”的默认值，方便直接用sql查
+            db.Execute("update map set SteamId = 0, SteamDistance = ?, SteamSimilarity = 0 where SteamId is null",
+                int.MaxValue);
+        });
+    }
+
+    private static void Add(Dictionary<int, SteamMatch> matches, int vndbId, SteamMatch match)
+    {
+        // 相似度更高的结果更好；相似度相同时取appid较小的，好让多次运行的结果保持一致
+        if (matches.TryGetValue(vndbId, out var exist) &&
+            (match.Similarity < exist.Similarity ||
+             (match.Similarity == exist.Similarity && match.AppId >= exist.AppId))) return;
+        matches[vndbId] = match;
+    }
+
+    private readonly record struct SteamMatch(int AppId, int Distance, float Similarity);
+
+    /// <summary>
+    /// 单个线程的匹配状态
+    /// </summary>
+    private sealed class MatchState(NameIndex index)
+    {
+        public readonly NameIndex.Matcher Matcher = index.CreateMatcher();
+        public readonly Dictionary<int, SteamMatch> Matches = new();
     }
 }
 
@@ -83,13 +133,13 @@ public class SteamApp
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class Apps
 {
-    public List<SteamApp> apps { get; set; } = null!;
+    public List<SteamApp>? apps { get; set; }
 }
 
 [SuppressMessage("ReSharper", "InconsistentNaming")]
 public class FullList
 {
-    public Apps applist { get; set; } = null!;
+    public Apps? applist { get; set; }
 }
 
 #endregion
