@@ -47,9 +47,16 @@ public class SteamUpgrader(SQLiteAsyncConnection connection)
         }
 
         Console.WriteLine($"Loaded {apps.Count} steam apps.");
+        var appNames = new Dictionary<int, string>();
+        foreach (var app in apps)
+            appNames[app.appid] = app.name ?? string.Empty;
         Console.WriteLine("Loading Game Titles...");
         var titles = await connection.Table<TitleModel>().ToListAsync();
         var index = new NameIndex(titles.Select(title => (title.Title!, title.VndbId)));
+
+        // vndb自己标了steam链接的，那些app归它标的那个游戏，不让别的游戏再按名字撞上来
+        var links = VndbLinks.LoadSteam("./assets/input/");
+        var claimed = links.Values.SelectMany(apps => apps).ToHashSet();
 
         // vndbId -> 此vndb游戏匹配到的最佳steam游戏
         var matches = new Dictionary<int, SteamMatch>();
@@ -61,7 +68,7 @@ public class SteamUpgrader(SQLiteAsyncConnection connection)
                 {
                     try
                     {
-                        if (string.IsNullOrWhiteSpace(app.name) == false)
+                        if (string.IsNullOrWhiteSpace(app.name) == false && claimed.Contains(app.appid) == false)
                             foreach (var match in state.Matcher.Match(app.name, SimilarityThreshold))
                                 Add(state.Matches, match.Id,
                                     new SteamMatch(app.appid, match.Distance, match.Similarity));
@@ -82,7 +89,19 @@ public class SteamUpgrader(SQLiteAsyncConnection connection)
                 });
         }
 
-        Console.WriteLine($"Matched {matches.Count} vndb games to steam, updating vn_mapper.db...");
+        // 有现成链接的直接用，盖掉按名字猜的结果
+        var authoritative = 0;
+        foreach (var (vndbId, linkedApps) in links)
+        {
+            // 一个游戏可能有多个appid（不同版本/补丁），优先取还在当前app列表里的那个
+            var appId = linkedApps.Find(id => appNames.ContainsKey(id));
+            if (appId == 0) appId = linkedApps[0];
+            matches[vndbId] = new SteamMatch(appId, 0, 1f);
+            authoritative++;
+        }
+
+        Console.WriteLine($"Matched {matches.Count} vndb games to steam " +
+                          $"({authoritative} of them from vndb's own steam links), updating vn_mapper.db...");
         await connection.RunInTransactionAsync(db =>
         {
             foreach (var (vndbId, match) in matches)

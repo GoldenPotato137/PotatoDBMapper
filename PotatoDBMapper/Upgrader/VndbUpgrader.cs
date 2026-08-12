@@ -89,19 +89,29 @@ public class VndbUpgrader
                     {
                         var item = maps.GetValueOrDefault(id) ?? new MapModel(id);
                         var name = string.Empty;
-                        foreach (var l in lineToProcess)
+
+                        // bangumi条目自己填了vndb链接的，直接用这个现成的关联，不用再按名字猜
+                        var linked = bgmClient.GetLinkedId(id, lineToProcess.Select(l => l.Split('\t')[titleIndex]));
+                        if (linked is { } authoritative)
                         {
-                            var data = l.Split('\t');
-                            if (data[officialIndex] != "t") continue;
-                            name = data[titleIndex];
-                            var result = bgmClient.GetId(data[titleIndex]);
-                            if (result.similarity > item.BgmSimilarity)
-                            {
-                                item.BgmDistance = result.distance;
-                                item.BgmSimilarity = result.similarity;
-                                item.BgmId = result.id;
-                            }
+                            item.BgmId = authoritative.id;
+                            item.BgmDistance = authoritative.distance;
+                            item.BgmSimilarity = authoritative.similarity;
                         }
+                        else
+                            foreach (var l in lineToProcess)
+                            {
+                                var data = l.Split('\t');
+                                if (data[officialIndex] != "t") continue;
+                                name = data[titleIndex];
+                                var result = bgmClient.GetId(data[titleIndex]);
+                                if (result.similarity > item.BgmSimilarity)
+                                {
+                                    item.BgmDistance = result.distance;
+                                    item.BgmSimilarity = result.similarity;
+                                    item.BgmId = result.id;
+                                }
+                            }
 
                         if (displayDetailedProgress)
                             Console.WriteLine(

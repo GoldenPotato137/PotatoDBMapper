@@ -45,18 +45,17 @@ https://github.com/GoldenPotato137/PotatoDBMapper/releases/download/db-latest/vn
   ：（int）此字段存储从vndb的游戏名到bangumi的游戏名的修改距离。它表示两个游戏名之间的相似度，数值越小，表示两个游戏名越相似。一般来说这个数值>
   3就可以认为结果不可信了。
 - **BgmSimilarity**: (float) 此字段存储从vndb的游戏名到bangumi的游戏名的相似度。`Similarity = 1 - Distance / max(Length(vndb), Length(bgm))`。
-数值越接近1表示两个游戏名越相似。一般来说这个数值大于0.8就可以认为结果可信了。相似度低于0.7的结果不会被写入。
+数值越接近1表示两个游戏名越相似。
 - **SteamId**：（int）此字段存储对应的steam的appid，没有匹配到时为0。
 - **SteamDistance**：（int）此字段存储从vndb的游戏名到steam的游戏名的修改距离，含义同**BgmDistance**。
 - **SteamSimilarity**：（float）此字段存储从vndb的游戏名到steam的游戏名的相似度。
-`Similarity = 1 - Distance / max(Length(vndb), Length(steam))`，相似度低于0.7的结果不会被写入。
+`Similarity = 1 - Distance / max(Length(vndb), Length(steam))`，含义同**BgmSimilarity**。
 - **YmgalId**：（int）此字段存储对应的[月幕Galgame](https://www.ymgal.games)的游戏档案id（gid），没有匹配到时为0。
   对应的页面为`https://www.ymgal.games/ga{YmgalId}`。
 - **YmgalDistance**：（int）此字段存储从vndb的游戏名到月幕Galgame的游戏名的修改距离，含义同**BgmDistance**。
   这里的游戏名包含月幕的原名、中文名与别名，取其中最相似的一个来计算。
 - **YmgalSimilarity**：（float）此字段存储从vndb的游戏名到月幕Galgame的游戏名的相似度。
-`Similarity = 1 - Distance / max(Length(vndb), Length(ymgal))`，相似度低于0.7的结果不会被写入。
-数值越接近1表示两个游戏名越相似，一般来说这个数值大于0.8就可以认为结果可信了。
+`Similarity = 1 - Distance / max(Length(vndb), Length(ymgal))`，含义同**BgmSimilarity**。
 
 表名： title
 
@@ -64,6 +63,36 @@ https://github.com/GoldenPotato137/PotatoDBMapper/releases/download/db-latest/vn
 
 - **VndbId**：（int）此字段存储游戏的vndb id。
 - **Title**：（string，主键）此字段存储游戏的名字。除了vndb的名字，还包含了从bangumi与月幕Galgame补充过来的中文名。
+
+## 正确率与召回率
+
+实验方式：抽取1890条映射逐条核对，判断两边是不是同一部作品。由于低相似度的映射没几条， 
+按比例抽根本抽不到，所以对它们做了超采样（每个相似度区间抽80~220条），最后再按各区间在全库的
+实际条数加权，还原成全库的估计值。
+
+正确率 = 判为同一部作品的条数 / 已判定的条数，判不准的存疑条目不计入分母：
+
+| 相似度区间     | bangumi条数 | bangumi正确率 | steam条数 | steam正确率 | 月幕条数 | 月幕正确率 |
+|:--------------|-----------:|-------------:|---------:|-----------:|--------:|----------:|
+| <0.70         | 339        | 78.6%        | 98       | 81.0%      | 81      | 70.8%     |
+| 0.70~0.80     | 390        | 34.3%        | 123      | 32.6%      | 94      | 38.2%     |
+| 0.80~0.90     | 491        | 57.8%        | 155      | 55.2%      | 130     | 75.7%     |
+| 0.90~1.00     | 435        | 80.0%        | 204      | 59.1%      | 243     | 94.1%     |
+| =1.00         | 28269      | 99.5%        | 10137    | 98.8%      | 30758   | ≈100%     |
+
+加权到全库后，各阈值的表现如下。其中：
+
+- **正确率**：相似度≥阈值的映射里，两边确实是同一部作品的比例
+- **召回率**：库里全部正确映射中，因相似度≥阈值而被保留下来的比例，衡量卡阈值会误伤多少对的结果
+  （只针对已经匹配出来的映射，不包括没匹配上的游戏）
+
+| Similarity阈值 | bangumi正确率 | bangumi召回率 | steam正确率 | steam召回率 | 月幕正确率 | 月幕召回率 |
+|:---------------|-------------:|-------------:|-----------:|-----------:|----------:|----------:|
+| 不过滤          | 97.5%        | 100%         | 96.5%      | 100%       | 99.6%     | 100%      |
+| ≥0.70          | 97.7%        | 99.1%        | 96.6%      | 99.2%      | 99.7%     | 99.8%     |
+| ≥0.80          | 98.6%        | 98.6%        | 97.4%      | 98.8%      | 99.9%     | 99.7%     |
+| ≥0.90          | 99.2%        | 97.7%        | 98.0%      | 98.0%      | ≈100%     | 99.4%     |
+| =1.00          | 99.5%        | 96.5%        | 98.8%      | 96.9%      | ≈100%     | 98.7%     |
 
 ## 数据来源
 

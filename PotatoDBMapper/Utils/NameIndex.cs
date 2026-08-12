@@ -41,6 +41,31 @@ public sealed class NameIndex
     /// <summary>所有倒排链拼接而成的大数组，内容为<see cref="_names"/>的下标</summary>
     private readonly int[] _postings;
 
+    /// <summary>按名字排序的副本，用来二分查出"以某个前缀开头的名字"</summary>
+    private readonly string[] _sorted;
+
+    private readonly int[] _sortedIndexes;
+
+    /// <summary>把名字反过来再排序的副本，用来同样地查后缀</summary>
+    private readonly string[] _sortedReversed;
+
+    private readonly int[] _sortedReversedIndexes;
+
+    /// <summary>纯拉丁字母的名字要达到这个相似度才认（见<see cref="Matcher.Acceptable"/>）</summary>
+    private const float LatinThreshold = 0.9f;
+
+    /// <summary>纯拉丁字母但长到这个程度的名字，相似度低一些也认</summary>
+    private const int LatinLongNameLength = 25;
+
+    /// <summary>按包含关系匹配时，较短的那个名字至少要有这么长，否则满大街都是</summary>
+    private const int MinContainLength = 6;
+
+    /// <summary>一个名字当前缀/后缀能命中太多候选，说明它没有区分度，直接放弃</summary>
+    private const int MaxContainCandidates = 16;
+
+    /// <summary>纯拉丁字母的名字按包含关系匹配时，两个名字的长度比至少要到这个程度</summary>
+    private const float LatinContainRatio = 0.8f;
+
     private readonly ConcurrentBag<Matcher> _pool = new();
 
     public int Count => _names.Length;
@@ -97,6 +122,21 @@ public sealed class NameIndex
             total += count;
             slot++;
         }
+
+        // 排序副本，供按前缀/后缀查包含关系用
+        _sortedIndexes = new int[_names.Length];
+        _sortedReversedIndexes = new int[_names.Length];
+        _sorted = new string[_names.Length];
+        _sortedReversed = new string[_names.Length];
+        for (var i = 0; i < _names.Length; i++)
+        {
+            _sortedIndexes[i] = _sortedReversedIndexes[i] = i;
+            _sorted[i] = _names[i];
+            _sortedReversed[i] = Reverse(_names[i]);
+        }
+
+        Array.Sort(_sorted, _sortedIndexes, StringComparer.Ordinal);
+        Array.Sort(_sortedReversed, _sortedReversedIndexes, StringComparer.Ordinal);
 
         _postingStarts[slot] = total;
         _postings = new int[total];
@@ -172,6 +212,47 @@ public sealed class NameIndex
 
     private static int BigramKey(string name, int index) => (name[index] << 16) | name[index + 1];
 
+    private static string Reverse(string name)
+    {
+        var chars = name.ToCharArray();
+        Array.Reverse(chars);
+        return new string(chars);
+    }
+
+    /// <summary>
+    /// 在排好序的名字里二分找出以prefix开头的那一段，命中太多则返回空区间
+    /// </summary>
+    private static (int start, int count) PrefixRange(string[] sorted, string prefix)
+    {
+        int lo = 0, hi = sorted.Length;
+        while (lo < hi)
+        {
+            var mid = (lo + hi) / 2;
+            if (string.CompareOrdinal(sorted[mid], prefix) < 0) lo = mid + 1;
+            else hi = mid;
+        }
+
+        var end = lo;
+        while (end < sorted.Length && sorted[end].StartsWith(prefix, StringComparison.Ordinal))
+        {
+            end++;
+            if (end - lo > MaxContainCandidates) return (0, 0);
+        }
+
+        return (lo, end - lo);
+    }
+
+    /// <summary>
+    /// 名字里有没有中日文（汉字、假名）
+    /// </summary>
+    private static bool HasCjk(string name)
+    {
+        foreach (var c in name)
+            if (c is >= '぀' and <= 'ヿ' or >= '㐀' and <= '鿿' or >= '豈' and <= '﫿')
+                return true;
+        return false;
+    }
+
     /// <summary>
     /// 匹配器。内部缓存了匹配过程中用到的数组以避免反复分配，因此<b>不是线程安全的</b>
     /// </summary>
@@ -214,6 +295,7 @@ public sealed class NameIndex
             }
 
             MatchFuzzily(query, threshold);
+            MatchByContainment(query);
             return _result;
         }
 
@@ -232,6 +314,65 @@ public sealed class NameIndex
             }
 
             return best;
+        }
+
+        /// <summary>
+        /// 按"一个名字完整包含另一个"来匹配。副标题、分卷、注音后缀这类情况下，两个名字长度差很多、
+        /// 相似度比值很低，但其实是同一个游戏（鈴がうたう日 / 鈴がうたう日 ～a story of…～），
+        /// 光靠编辑距离比值是捞不回来的。多出来的那一截必须与短名字用标点隔开，见<see cref="Delimited"/>。
+        /// </summary>
+        private void MatchByContainment(string query)
+        {
+            // 一、索引里的某个名字正好是query的前缀或后缀
+            for (var length = MinContainLength; length < query.Length; length++)
+            {
+                if (_index._exact.TryGetValue(query[..length], out var head))
+                    foreach (var hit in head) AddContained(hit, query);
+                if (_index._exact.TryGetValue(query[^length..], out var tail))
+                    foreach (var hit in tail) AddContained(hit, query);
+            }
+
+            // 二、query正好是索引里某些名字的前缀或后缀
+            if (query.Length < MinContainLength) return;
+            var (start, count) = PrefixRange(_index._sorted, query);
+            for (var i = start; i < start + count; i++)
+                AddContained(_index._sortedIndexes[i], query);
+            (start, count) = PrefixRange(_index._sortedReversed, Reverse(query));
+            for (var i = start; i < start + count; i++)
+                AddContained(_index._sortedReversedIndexes[i], query);
+        }
+
+        /// <summary>
+        /// 记下一个包含关系的匹配。一方完整包含另一方时，编辑距离就是长度差。<br/>
+        /// 纯拉丁的短名字经常只是长名字里的一个普通单词（Parasite 之于 Perfect Parasite），
+        /// 所以要求两个名字长度接近才认；含中日文的名字这么撞的概率低得多。
+        /// </summary>
+        private void AddContained(int candidate, string query)
+        {
+            var name = _index._names[candidate];
+            int longer = Math.Max(name.Length, query.Length), shorter = Math.Min(name.Length, query.Length);
+            if (shorter < MinContainLength || longer == shorter) return;
+            var similarity = shorter / (float)longer;
+            if (similarity < LatinContainRatio && HasCjk(name) == false && HasCjk(query) == false) return;
+            if (Delimited(name, query) == false) return;
+            _result.Add(new NameMatch(_index._ids[candidate], longer - shorter, similarity));
+        }
+
+        /// <summary>
+        /// 长名字里多出来的那一截，是不是靠标点与短名字隔开的。<br/>
+        /// 隔开了才算副标题/注音/版本说明（鈴がうたう日 ～a story of…～、Charon-カロン-、
+        /// 明日、嘘がわからなくなっても Complete BOX），这时两边是同一个游戏；
+        /// 直接连着写下去的多半是续作编号或另一个词（White Noise / White Noise 2、
+        /// ぴゅあぴゅあ / ぴゅあぴゅあ電撃姫オリジナル、Fragment / Fragments），那就是另一个游戏了。
+        /// </summary>
+        private static bool Delimited(string a, string b)
+        {
+            var (inner, outer) = a.Length < b.Length ? (a, b) : (b, a);
+            // 紧贴着短名字那一头的字符：多出来的部分接在后面就取它的第一个字，接在前面就取最后一个字
+            var boundary = outer.StartsWith(inner, StringComparison.Ordinal)
+                ? outer[inner.Length]
+                : outer[^(inner.Length + 1)];
+            return char.IsLetterOrDigit(boundary) == false;
         }
 
         private void MatchFuzzily(string query, float threshold)
@@ -258,10 +399,26 @@ public sealed class NameIndex
                 if (common < maxLength - 1 - 2 * maxDistance) continue;
                 var distance = BoundedLevenshtein(query, name, maxDistance);
                 if (distance < 0) continue;
-                _result.Add(new NameMatch(_index._ids[candidate], distance, 1 - distance / (float)maxLength));
+                var similarity = 1 - distance / (float)maxLength;
+                if (Acceptable(query, name, similarity) == false) continue;
+                _result.Add(new NameMatch(_index._ids[candidate], distance, similarity));
             }
 
             _touched.Clear();
+        }
+
+        /// <summary>
+        /// 这一对名字够不够像，能不能算同一个游戏。<br/>
+        /// 纯拉丁字母的名字又短又通用（Meaning/Beaming、Myopia/Mystopia、Noel/NOL……），
+        /// 改一两个字母往往就是另一个真实存在的游戏，光看相似度比值会放进来大量垃圾；
+        /// 而含中日文的名字信息密度高，同样的编辑距离基本都是同一个游戏的不同写法。
+        /// 所以纯拉丁的名字要求更严：要么相似度足够高，要么名字本身足够长（长名字错几个字母仍然可信）。
+        /// </summary>
+        private static bool Acceptable(string a, string b, float similarity)
+        {
+            if (similarity >= LatinThreshold) return true;
+            if (HasCjk(a) || HasCjk(b)) return true;
+            return Math.Min(a.Length, b.Length) >= LatinLongNameLength;
         }
 
         /// <summary>

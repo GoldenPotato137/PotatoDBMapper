@@ -6,7 +6,9 @@ You can run bash in this folder to avoid downloading them manually.
 ## VNDB
 Download it from https://dl.vndb.org/dump/vndb-db-latest.tar.zst
 
-Unpack it and put everything in db folder here.
+Unpack it and put everything in db folder here. Besides the `vn_titles` names, the mapper also reads
+`extlinks` / `releases_extlinks` / `releases_vn` — that is where vndb keeps its own steam appids,
+which beats guessing by name.
 
 ## Bangumi
 Download it from https://github.com/bangumi/Archive/releases/tag/archive
