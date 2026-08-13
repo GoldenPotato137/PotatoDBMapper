@@ -1,0 +1,14 @@
+﻿<Project>
+
+    <PropertyGroup>
+        <!--两个nuget包共用同一个版本号，一起发布，免得mapper引用到老版本的Models。
+            这里的值仅作占位符，实际版本由CI（github action）自动填充-->
+        <Version>1.1.0</Version>
+        <Authors>goldenpotato137</Authors>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/GoldenPotato137/PotatoDBMapper</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/GoldenPotato137/PotatoDBMapper</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+    </PropertyGroup>
+
+</Project>

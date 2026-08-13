@@ -31,6 +31,16 @@ https://github.com/GoldenPotato137/PotatoDBMapper/releases/download/db-latest/vn
 
 月幕Galgame与steam的输入文件不存在时，对应的匹配会自动跳过，不影响其他部分。
 
+## 在C#里查映射
+
+不想自己写sql的话，可以直接用[PotatoVnDBMapper](https://www.nuget.org/packages/PotatoVnDBMapper)这个nuget包，
+它封装了按vndb id、bangumi id、steam appid、月幕Galgame gid以及游戏名查映射的方法，用法见
+[NugetPackage/README.md](https://github.com/GoldenPotato137/PotatoDBMapper/blob/main/NugetPackage/README.md)。
+
+只需要表结构、想自己写查询的话，可以只装
+[PotatoVnDBMapper.Models](https://www.nuget.org/packages/PotatoVnDBMapper.Models)。
+两个包版本号一致，一起发布。
+
 ## 表结构
 
 ### vn_mapper.db

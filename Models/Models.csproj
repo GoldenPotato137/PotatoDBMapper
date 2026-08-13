@@ -5,22 +5,18 @@
         <LangVersion>latestmajor</LangVersion>
         <Nullable>enable</Nullable>
         <PackageId>PotatoVnDBMapper.Models</PackageId>
-        <!--Version仅作占位符，实际版本由CI（github action）自动填充-->
-        <Version>1.0.0</Version> 
-        <Authors>goldenpotato137</Authors>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <PackageProjectUrl>https://github.com/GoldenPotato137/PotatoDBMapper</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/GoldenPotato137/PotatoDBMapper</RepositoryUrl>
-        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <Description>PotatoDBMapper映射库（vn_mapper.db）的表结构定义，包含map表与title表对应的sqlite-net模型。</Description>
+        <PackageTags>vndb;bangumi;steam;ymgal;galgame;visual-novel;sqlite</PackageTags>
         <PackageReadmeFile>README.md</PackageReadmeFile>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
     <ItemGroup>
       <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
     </ItemGroup>
-    
+
     <ItemGroup>
-        <None Include="../NugetPackage/README.md">
+        <None Include="README.md">
             <Pack>True</Pack>
             <PackagePath>\</PackagePath>
         </None>

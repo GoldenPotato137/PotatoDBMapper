@@ -1,0 +1,62 @@
+name: Publish Nuget Packages
+
+# Models和Mapper两个包以前各有一个workflow、各发各的版本，结果Models加了字段而Mapper那边
+# 还引着写死的老版本，发出去的包就少了新字段。现在两个包共用一个版本号，永远一起发
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Models/**'
+      - 'NugetPackage/**'
+      - 'Directory.Build.props'
+      - '.github/workflows/publish-nuget.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '要发布的版本号，留空则用 1.1.<run_number>'
+        required: false
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8
+
+      - name: Resolve version
+        id: version
+        run: echo "value=${{ inputs.version || format('1.1.{0}', github.run_number) }}" >> "$GITHUB_OUTPUT"
+
+      # 结果库不在仓库里，不下下来的话测试会自己跳过，那这一步就白跑了
+      - name: Download database
+        run: |
+          mkdir -p assets/db
+          curl -fsSL -o assets/db/vn_mapper.db \
+            https://github.com/GoldenPotato137/PotatoDBMapper/releases/download/db-latest/vn_mapper.db
+
+      - name: Test
+        run: dotnet test NugetPackage.Test/NugetPackage.Test.csproj -c Release
+
+      - name: Build and pack the libraries
+        run: |
+          dotnet pack Models/Models.csproj -c Release -p:Version=${{ steps.version.outputs.value }} -o /tmp/nupkg
+          dotnet pack NugetPackage/NugetPackage.csproj -c Release -p:Version=${{ steps.version.outputs.value }} -o /tmp/nupkg
+
+      - name: Upload NuGet packages as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PotatoVnDBMapper.${{ steps.version.outputs.value }}
+          path: /tmp/nupkg/*.nupkg
+
+      - name: Push to NuGet repository
+        run: |
+          dotnet nuget push "/tmp/nupkg/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json --skip-duplicate

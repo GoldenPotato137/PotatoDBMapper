@@ -4,15 +4,11 @@
         <TargetFramework>netstandard2.0</TargetFramework>
         <LangVersion>latestmajor</LangVersion>
         <Nullable>enable</Nullable>
-        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <PackageId>PotatoVnDBMapper</PackageId>
-        <!--Version仅作占位符，实际版本由CI（github action）自动填充-->
-        <Version>1.0.0</Version>
-        <Authors>goldenpotato137</Authors>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <PackageProjectUrl>https://github.com/GoldenPotato137/PotatoDBMapper</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/GoldenPotato137/PotatoDBMapper</RepositoryUrl>
+        <Description>查询PotatoDBMapper映射库（vn_mapper.db）的封装：按vndb id、bangumi id、steam appid、月幕Galgame gid或游戏名查出对应的映射。</Description>
+        <PackageTags>vndb;bangumi;steam;ymgal;galgame;visual-novel;sqlite</PackageTags>
         <PackageReadmeFile>README.md</PackageReadmeFile>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
     <ItemGroup>
@@ -22,7 +18,11 @@
         </None>
     </ItemGroup>
 
+    <!--以前这里引的是发布出去的PotatoVnDBMapper.Models包，版本写死在csproj里，
+        结果Models加了字段而这边忘了跟着升，本包就一直编译在老模型上（比如月幕的三个字段就漏了）。
+        改成引项目本身，两个包由同一个workflow用同一个版本号一起发布，不会再对不上-->
     <ItemGroup>
-      <PackageReference Include="PotatoVnDBMapper.Models" Version="1.0.5" />
+        <ProjectReference Include="..\Models\Models.csproj" />
     </ItemGroup>
+
 </Project>
